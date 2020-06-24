@@ -27,4 +27,5 @@ $(OBJ): Makefile
 clean:
 	@echo Cleaning project...
 	@rm $(PROGNAME)
+	@rm $(PREFIX)/pong
 	@echo Done!

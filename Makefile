@@ -10,10 +10,10 @@ endif
 all: $(PROGNAME)
 
 $(PROGNAME): $(OBJ)
-	@$(CC) -o $(PROGNAME) $(OBJ) $(LDFLAGS)
+	@$(CC) -o build/$(PROGNAME) $(OBJ) $(LDFLAGS)
 
 install: $(PROGNAME)
-	@cp pong $(PREFIX)
+	@cp build/$(PROGNAME) $(PREFIX)
 
 $(OBJ): Makefile
 

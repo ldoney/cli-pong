@@ -1,7 +1,19 @@
 #Makefile
-CC=cc
-CFLAGS=-I
+PROGNAME = pong
+OBJ = src/pong.c
 LDFLAGS=-lncurses -lm
 
-all: 
-	$(CC) -o game src/pong.c $(LDFLAGS)
+ifeq ($(PREFIX),)
+    PREFIX := /usr/local
+endif
+
+all: $(PROGNAME)
+
+$(PROGNAME): $(OBJ)
+	@$(CC) -o $(PROGNAME) $(OBJ) $(LDFLAGS)
+
+$(OBJ): Makefile
+
+.PHONY: clean
+clean:
+	@rm $(PROGNAME)

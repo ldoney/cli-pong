@@ -10,6 +10,7 @@ endif
 all: $(PROGNAME)
 
 $(PROGNAME): $(OBJ)
+	@mkdir build
 	@$(CC) -o build/$(PROGNAME) $(OBJ) $(LDFLAGS)
 
 install: $(PROGNAME)

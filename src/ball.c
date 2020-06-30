@@ -12,7 +12,7 @@ static void ball_reset(WINDOW *win, struct Ball *this) {
     this->m_y = max_y / 2;
 }
 static struct Ball ball_new() {
-    return (struct Ball){.draw=&ball_draw, .reset=&ball_reset};
+    return (struct Ball){.m_x = 0, .m_y = 0, .m_v_x = 0, .m_v_y = 0,.draw=&ball_draw, .reset=&ball_reset};
 }
 
 const struct BallClass Ball={.new=&ball_new};

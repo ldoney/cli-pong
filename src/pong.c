@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "racket.c"
 #include "ball.c"
+#include "ai.c"
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
@@ -18,6 +19,7 @@
 #define DELAY 30000
 
 #define MARGIN 30
+#define SELECT_DIFF 3
 #define CENTER "|"
 
 #define MAX_BOUNCE 20*PI/12
@@ -27,6 +29,7 @@
 
 #define P2_UP 111
 #define P2_DOWN 108
+
 /*
  _____      ____        __      _      _____   
 (  __ \    / __ \      /  \    / )    / ___ \  
@@ -51,8 +54,9 @@ const char *titleText[7] = {
 int score1 = 0, score2 = 0;
 int max_x = 0, max_y = 0;
 struct Racket p1, p2;
+struct Bot bot;
 struct Ball ball;
-
+int Mode = 2;
 int kbhit (void)
 {
 	struct timeval tv;
@@ -109,19 +113,23 @@ void resetBoard(WINDOW *win) {
 	refresh();
 }
 int isCollision() {
-	if((int)ball.m_x == (int)p1.m_x) {
-		for(int i = 0; i < p1.m_size; i++) {
-			if(((int)p1.m_y - (p1.m_size/2)+i) == (int)ball.m_y)
-			{
-				return 1;
+	for(int j = 0; j < abs(((int)ball.m_v_x)); j++) {
+		if((int)ball.m_x + (j * ball.m_v_x) == (int)p1.m_x) {
+			for(int i = 0; i < p1.m_size; i++) {
+				if(((int)p1.m_y - (p1.m_size/2)+i) == (int)ball.m_y)
+				{
+					return 1;
+				}
 			}
 		}
 	}
-	if((int)ball.m_x == (int)p2.m_x) {
-		for(int i = 0; i < p2.m_size; i++) {
-			if(((int)p2.m_y - (p2.m_size/2)+i) == (int)ball.m_y)
-			{
-				return -1;
+	for(int j = 0; j < abs(((int)ball.m_v_x)); j++) {
+		if((int)ball.m_x + (j * ball.m_v_x) == (int)p2.m_x) {
+			for(int i = 0; i < p2.m_size; i++) {
+				if(((int)p2.m_y - (p2.m_size/2)+i) == (int)ball.m_y)
+				{
+					return -1;
+				}
 			}
 		}
 	}
@@ -140,8 +148,13 @@ int main(int argc, char *argv[]) {
 	int selected = 0;
 	int ch = 0;
 	int maxselect = 0;
+	int nested = 0;
+	char* mainMenu[2] = {"Play", "Exit"};
+	char* modeSelect[2] = {"One player", "Two Player"};
+	char *(*nestMenu)[2] = &mainMenu;
 	char buff[50];
 
+	
 	while(!start){
     	getmaxyx(stdscr, max_y, max_x);
 		maxselect = 0;
@@ -152,17 +165,20 @@ int main(int argc, char *argv[]) {
 			mvwprintw(stdscr, (max_y/2)-15 + i, (max_x/2) - (strlen(titleText[1])/2), titleText[i]);
 		}
 		
-		if(selected == 0)
-			attron(A_STANDOUT);
-		mvwprintw(stdscr, max_y/2, (max_x/2)-2, "Play");
-		attroff(A_STANDOUT);
-		maxselect++;
+		
+		if(nested == 0)
+			nestMenu = &mainMenu;
+		else if(nested == 1)
+			nestMenu = &modeSelect;
 
-		if(selected == 1)
-			attron(A_STANDOUT);
-		mvwprintw(stdscr, (max_y/2) + 1, (max_x/2)-2, "Exit");
-		attroff(A_STANDOUT);
-		maxselect++;
+		for(int i = 0; i < sizeof((*nestMenu))/sizeof((*nestMenu)[0]); i++)
+		{
+			if(selected == i)
+				attron(A_STANDOUT);
+			mvwprintw(stdscr, max_y/2 + (i * SELECT_DIFF), (max_x/2)-(strlen((*nestMenu)[i])/2), (*nestMenu)[i]);
+			attroff(A_STANDOUT);
+			maxselect++;
+		}
 
 		mvwprintw(stdscr, max_y/2 + 15, (max_x/2)-12, "Created by Lincoln Doney");
 		
@@ -176,11 +192,21 @@ int main(int argc, char *argv[]) {
 				switch(selected)
 				{
 					case 0:
-						start = true;
+						if(nested == 0)
+							nested = 1;
+						else if(nested == 1) {
+							Mode = 1;
+							start = true;
+						}
 						break;
 					case 1:
-						endwin();
-						return 0;
+						if(nested == 0){							
+							endwin();
+							return 0;
+						} else if(nested == 1) {
+							Mode = 2;
+							start = true;
+						}
 						break;
 				}
 			}
@@ -209,15 +235,23 @@ int main(int argc, char *argv[]) {
 	
 	ball=Ball.new();
 	ball.reset(game, &ball);
-
+	
 	p1=Racket.new("Player 1", MARGIN, max_y / 2);
 	p2=Racket.new("Player 2", max_x - MARGIN, max_y / 2);
-	
+
+	if(Mode == 1) {
+		bot=Bot.new(p2);
+	}
 
 	int collision = 0;
 
 	resetBoard(game);
 
+	char part[50];
+	sprintf(part, "No collision!");
+
+	int y = (int)ball.m_y;
+	
     while(1) {
    		getmaxyx(stdscr, max_y, max_x);
 		if (kbhit()) {
@@ -226,8 +260,7 @@ int main(int argc, char *argv[]) {
 				p1.m_y--;
 			else if(ch == P1_DOWN)
 				p1.m_y++;
-			else if(ch == '\033')
-			{
+			else if(Mode == 2 && ch == '\033') {
 				getch();
 				switch(getch()) {
 					case 'A':
@@ -239,6 +272,65 @@ int main(int argc, char *argv[]) {
 				}
 			}
 		}
+		y = (int)ball.m_y;
+
+		int collision = isCollision();
+		if(collision != 0) {
+			struct Racket colP = (collision == 1 ? p1 : p2);
+			int y1 = colP.m_y-(colP.m_size/2),
+				y2 = colP.m_y-(colP.m_size/4),
+				y0 = colP.m_y,
+				y3 = colP.m_y+(colP.m_size/4),
+				y4 = colP.m_y+(colP.m_size/2);
+			int region;
+			double angle;
+			if(y == y0) {
+				region = 0;
+			} else if(y >= y1 && y < y2) {
+				region = 1;
+			} else if(y >= y2 && y < y0) {
+				region = 2;	
+			} else if(y > y0 && y <= y3) {
+				region = 3;
+			} else if(y > y3 && y <= y4) {
+				region = 4;
+			}
+			double speed = sqrt((ball.m_v_x * ball.m_v_x) + (ball.m_v_y * ball.m_v_y)) * 1.5;
+			switch(region)
+			{
+				case 0:
+					//Center
+					angle = 0;
+					ball.m_v_x = collision * speed;
+					ball.m_v_y = 0;
+					break;
+				case 1:
+					//Top
+					angle = 45;
+					ball.m_v_x = (collision * speed)*2/4;
+					ball.m_v_y = -speed*3 / 4;
+					break;
+				case 2:
+					//Middle (Top)
+					angle = 15;
+					ball.m_v_x = (collision * speed)*2/4;
+					ball.m_v_y = -speed*2 / 4;
+					break;
+				case 3:
+					//Middle (Bottom)
+					angle = -15;
+					ball.m_v_x = (collision * speed)*2/4;
+					ball.m_v_y = speed*2 / 4;
+					break;
+				case 4:
+					//Bottom
+					angle = -45;
+					ball.m_v_x = (collision * speed)*2/4;
+					ball.m_v_y = speed*3 / 4;
+					break;
+			}
+		}
+
 		werase(game);
 		printBoard(game);
 
@@ -246,15 +338,6 @@ int main(int argc, char *argv[]) {
 		p1.draw(game, &p1);
 		p2.draw(game, &p2);
 
-		if(collision=isCollision() != 0) {
-			struct Racket colP = (collision == 1 ? p1 : p2);
-			double relIntersectY = (colP.m_y+(colP.m_size/2) - ball.m_y);
-			double normalizedRelIntersectY = (relIntersectY/(colP.m_size/2));
-			double angle = MIN(normalizedRelIntersectY, MAX_BOUNCE);
-			double speed = sqrt(ball.m_v_x * ball.m_v_x + ball.m_v_y * ball.m_v_y);;
-			ball.m_v_x = speed * (ball.m_v_x < 0 ? 1 : -1)*cos(angle-(PI/2));
-			ball.m_v_y = speed * sin(angle-(PI/2));
-		}
 		wrefresh(game);
 		usleep(DELAY);
 
@@ -263,15 +346,25 @@ int main(int argc, char *argv[]) {
 		if(ball.m_y <= 0 || ball.m_y >= max_y)
 			ball.m_v_y = -ball.m_v_y;
 		
-		if(ball.m_x <= 0)
-		{
+		if(ball.m_x <= 0) {
 			score1++;
 			resetBoard(game);
 		}
-		else if(ball.m_x >= max_x)
-		{
+		else if(ball.m_x >= max_x) {
 			score2++;
 			resetBoard(game);
+		}
+		if(Mode == 1) {
+			if(ball.m_v_x >= 0 && abs(p2.m_x - ball.m_x) < 10)
+			{
+				double impactDistance = (max_x - MARGIN) - ball.m_x;
+				double impactTime = impactDistance / (ball.m_v_x);
+				double targetY = MAX(0,MIN(ball.m_y + (ball.m_v_y) * impactTime, max_y));
+
+				if (!(abs(targetY - p2.m_y) < 3)) {
+					p2.m_y += (targetY + (p2.m_y + p2.m_size/2))/16;
+				}
+			}
 		}
     }
     endwin();
